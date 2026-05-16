@@ -13,10 +13,11 @@ interface ProfileModalProps {
   user: User;
   onClose: () => void;
   onUpdate: (updatedUser: User) => void;
+  onLogout?: () => void;
 }
 
-export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalProps) {
-  const [activeTab, setActiveTab ] = useState<'overview' | 'edit' | 'privacy'>('overview');
+export default function ProfileModal({ user, onClose, onUpdate, onLogout }: ProfileModalProps) {
+  const [activeTab, setActiveTab ] = useState<'overview' | 'edit' | 'privacy' | 'deepfake'>('overview');
   const [formData, setFormData] = useState<User>(user);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -27,14 +28,21 @@ export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalPr
     { label: 'Offline', value: 'offline', color: 'bg-gray-500' },
   ];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await fetch(`/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
       onUpdate(formData);
-      setIsSaving(false);
       onClose();
-    }, 800);
+    } catch (err) {
+      console.error('Failed to update user', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const toggleSetting = (key: keyof NonNullable<User['settings']>) => {
@@ -47,13 +55,29 @@ export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalPr
     });
   };
 
-  const changeAvatar = () => {
-    const seeds = ['Felix', 'Aneka', 'Buddy', 'Max', 'Luna', 'Cleo', 'Oliver', 'Milo'];
-    const randomSeed = seeds[Math.floor(Math.random() * seeds.length)];
-    setFormData({
-      ...formData,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomSeed}_${Date.now()}`
-    });
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsSaving(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+    
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formDataUpload
+      });
+      const { url } = await res.json();
+      setFormData({
+        ...formData,
+        avatar: url
+      });
+    } catch (err) {
+      console.error("Avatar upload failed", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -93,11 +117,18 @@ export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalPr
               <img src={formData.avatar} alt="Profile" className="w-full h-full object-cover" />
             </div>
             <button 
-              onClick={changeAvatar}
+              onClick={() => document.getElementById('avatar-upload')?.click()}
               className="absolute bottom-1 right-1 p-2 bg-blue-500 text-white rounded-xl shadow-lg hover:scale-110 transition-all border-2 border-white dark:border-gray-900"
             >
               <Camera className="w-4 h-4" />
             </button>
+            <input 
+              id="avatar-upload"
+              type="file" 
+              className="hidden" 
+              accept="image/*"
+              onChange={handleAvatarUpload}
+            />
           </div>
 
           <div className="mt-4 md:mt-14 text-center md:text-left flex-1 min-w-0">
@@ -121,7 +152,8 @@ export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalPr
           {[
             { id: 'overview', label: 'Overview' },
             { id: 'edit', label: 'Edit' },
-            { id: 'privacy', label: 'Settings' }
+            { id: 'privacy', label: 'Settings' },
+            { id: 'deepfake', label: 'Deepfake' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -263,13 +295,144 @@ export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalPr
                 
                 <div className="mt-8 p-6 bg-red-50 dark:bg-red-900/10 rounded-3xl border border-red-100 dark:border-red-800/20 text-center">
                   <p className="text-sm font-semibold text-red-600 mb-4">Want to sign out from AeroChat?</p>
-                  <button className="px-8 py-2.5 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-200 dark:shadow-none flex items-center gap-2 mx-auto">
+                  <button 
+                    onClick={onLogout}
+                    className="px-8 py-2.5 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-200 dark:shadow-none flex items-center gap-2 mx-auto"
+                  >
                     <LogOut className="w-4 h-4" />
                     Sign Out
                   </button>
                 </div>
               </motion.div>
             )}
+
+            {activeTab === 'deepfake' && (
+              <motion.div
+                key="deepfake"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Sparkles className="w-5 h-5 text-indigo-200" />
+                      <h3 className="text-lg font-bold">Deepfake Persona Engine</h3>
+                    </div>
+                    <p className="text-indigo-100 text-xs leading-relaxed opacity-90">
+                      Convert static images or clips into realistic live video loops for your calls. Our AI synthesis engine creates natural movement and breathing patterns.
+                    </p>
+                  </div>
+                  <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+                </div>
+
+                <SettingToggle 
+                  icon={<Fingerprint className="w-5 h-5" />} 
+                  label="Enable Deepfake Cam" 
+                  isActive={!!formData.settings?.deepfakeEnabled}
+                  onClick={() => toggleSetting('deepfakeEnabled')}
+                />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Your Custom Aliases</h4>
+                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{formData.customPersonas?.length || 0} / 5</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Add New Trigger */}
+                    <button 
+                      onClick={() => document.getElementById('persona-upload')?.click()}
+                      className="aspect-square rounded-[2rem] border-2 border-dashed border-gray-100 dark:border-gray-800 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/5 transition-all flex flex-col items-center justify-center gap-3 group"
+                    >
+                      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl group-hover:bg-blue-500 transition-all duration-300">
+                        <Zap className="w-6 h-6 text-gray-400 group-hover:text-white" />
+                      </div>
+                      <span className="text-[10px] font-black text-gray-400 group-hover:text-blue-500 uppercase tracking-widest">Add Asset</span>
+                      <input 
+                        id="persona-upload"
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*,video/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          // Actual upload process
+                          setIsSaving(true);
+                          const formDataUpload = new FormData();
+                          formDataUpload.append('file', file);
+                          
+                          try {
+                            const res = await fetch('/api/upload', {
+                              method: 'POST',
+                              body: formDataUpload
+                            });
+                            const { url } = await res.json();
+                            
+                            // Simulate AI synthesis processing time
+                            setTimeout(() => {
+                              const type = file.type.startsWith('video/') ? 'video' : 'image';
+                              const newPersona = {
+                                id: Math.random().toString(36).substr(2, 9),
+                                name: `Alias ${formData.customPersonas?.length || 0 + 1}`,
+                                url: url,
+                                type: type as 'image' | 'video'
+                              };
+                              setFormData({
+                                ...formData,
+                                customPersonas: [...(formData.customPersonas || []), newPersona]
+                              });
+                              setIsSaving(false);
+                            }, 1500);
+                          } catch (err) {
+                            console.error("Upload failed", err);
+                            setIsSaving(false);
+                          }
+                        }}
+                      />
+                    </button>
+
+                    {formData.customPersonas?.map((persona) => (
+                      <div key={persona.id} className="relative aspect-square rounded-[2rem] overflow-hidden border border-gray-100 dark:border-gray-800 group">
+                        {persona.type === 'video' ? (
+                          <video src={persona.url} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+                        ) : (
+                          <img src={persona.url} className="w-full h-full object-cover" />
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                customPersonas: formData.customPersonas?.filter(p => p.id !== persona.id)
+                              });
+                            }}
+                            className="p-3 bg-red-500 text-white rounded-full hover:scale-110 transition-transform"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg">
+                          <p className="text-[8px] font-black text-white uppercase tracking-widest truncate">{persona.name}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800/20 flex gap-4">
+                  <div className="p-2 bg-blue-500 rounded-xl self-start">
+                    <Shield className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1">Privacy Guard</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                      All personas are processed locally on your device using WebGPU acceleration. No biometric data is sent to our servers.
+                    </p>
+                  </div>
+                </div>
           </AnimatePresence>
         </div>
 

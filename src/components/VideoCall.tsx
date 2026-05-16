@@ -10,6 +10,7 @@ interface VideoCallProps {
   chatId: string;
   isIncoming?: boolean;
   offerSignal?: any;
+  user?: any; // Using any for simplicity, or import User
 }
 
 interface Persona {
@@ -25,32 +26,81 @@ const DEFAULT_PERSONAS: Persona[] = [
   { id: 'p3', name: 'Nexus AI', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop', type: 'image' },
 ];
 
-export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming, offerSignal }: VideoCallProps) {
+export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming, offerSignal, user }: VideoCallProps) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isDeepFakeMode, setIsDeepFakeMode] = useState(false);
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
-  const [selectedPersona, setSelectedPersona] = useState<Persona>(DEFAULT_PERSONAS[0]);
-  const [customPersonas, setCustomPersonas] = useState<Persona[]>([]);
+  const [selectedPersona, setSelectedPersona] = useState<Persona>(user?.customPersonas?.[0] || DEFAULT_PERSONAS[0]);
+  const [customPersonas, setCustomPersonas] = useState<Persona[]>(user?.customPersonas || []);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  
+  const rawVideoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const personaVideoRef = useRef<HTMLVideoElement>(null);
+  const personaImageRef = useRef<HTMLImageElement>(null);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<Peer.Instance | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const stateRef = useRef({ isDeepFakeMode, isVideoOn, selectedPersona });
+  useEffect(() => {
+    stateRef.current = { isDeepFakeMode, isVideoOn, selectedPersona };
+  }, [isDeepFakeMode, isVideoOn, selectedPersona]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId: number;
+
+    const draw = () => {
+      const { isDeepFakeMode, isVideoOn, selectedPersona } = stateRef.current;
+      
+      if (isDeepFakeMode) {
+        if (selectedPersona.type === 'video' && personaVideoRef.current) {
+          ctx?.drawImage(personaVideoRef.current, 0, 0, canvas.width, canvas.height);
+        } else if (selectedPersona.type === 'image' && personaImageRef.current) {
+          ctx?.drawImage(personaImageRef.current, 0, 0, canvas.width, canvas.height);
+        }
+      } else {
+        if (isVideoOn && rawVideoRef.current) {
+          ctx?.drawImage(rawVideoRef.current, 0, 0, canvas.width, canvas.height);
+        } else {
+          ctx!.fillStyle = 'black';
+          ctx?.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
   useEffect(() => {
     const initCall = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
+        if (rawVideoRef.current) rawVideoRef.current.srcObject = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+        // Combine canvas video stream with real microphone audio
+        const canvasStream = canvasRef.current!.captureStream(30);
+        const combinedStream = new MediaStream([
+          canvasStream.getVideoTracks()[0],
+          stream.getAudioTracks()[0]
+        ]);
 
         const peer = new Peer({
           initiator: !isIncoming,
           trickle: false,
-          stream: stream,
+          stream: combinedStream,
         });
 
         peer.on('signal', (data) => {
@@ -89,6 +139,12 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
     };
   }, []);
 
+  useEffect(() => {
+    if (!isDeepFakeMode && localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [isDeepFakeMode, localStream]);
+
   const toggleMic = () => {
     if (localStream) {
       localStream.getAudioTracks()[0].enabled = !isMicOn;
@@ -121,11 +177,20 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
     setShowPersonaMenu(false);
   };
 
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Normalize mouse position to range [-1, 1] to simulate head tracking
+    if (!isDeepFakeMode) return;
+    const x = (e.clientX / window.innerWidth) * 2 - 1;
+    const y = (e.clientY / window.innerHeight) * 2 - 1;
+    setMousePos({ x, y });
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      onMouseMove={handleMouseMove}
       className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-white overflow-hidden"
     >
       {/* Remote Video (Main) */}
@@ -166,18 +231,43 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
               >
                 {selectedPersona.type === 'video' ? (
                   <video 
+                    ref={personaVideoRef}
                     src={selectedPersona.url} 
                     autoPlay 
                     loop 
                     muted 
                     playsInline 
+                    crossOrigin="anonymous"
                     className="w-full h-full object-cover filter brightness-125 saturate-[1.2] contrast-[1.1]" 
                   />
                 ) : (
-                  <img 
-                    src={selectedPersona.url} 
-                    className="w-full h-full object-cover filter brightness-125 saturate-[1.2] contrast-[1.1]" 
-                  />
+                  <motion.div
+                    className="w-full h-full relative"
+                    animate={{
+                      x: mousePos.x * -15, // Move opposite to cursor for parallax
+                      y: mousePos.y * -15,
+                      rotateY: mousePos.x * -15,
+                      rotateX: mousePos.y * 15,
+                    }}
+                    transition={{ type: "spring", stiffness: 150, damping: 20 }}
+                    style={{ transformPerspective: 500 }}
+                  >
+                    <motion.img 
+                      ref={personaImageRef}
+                      src={selectedPersona.url} 
+                      crossOrigin="anonymous"
+                      animate={{ 
+                        scale: [1.1, 1.12, 1.1], // Slightly scaled up to hide edges during rotation
+                        filter: ['brightness(1.25) saturate(1.2) contrast(1.1)', 'brightness(1.3) saturate(1.2) contrast(1.1)', 'brightness(1.25) saturate(1.2) contrast(1.1)']
+                      }}
+                      transition={{ 
+                        duration: 4, 
+                        repeat: Infinity, 
+                        ease: "easeInOut" 
+                      }}
+                      className="w-full h-full object-cover" 
+                    />
+                  </motion.div>
                 )}
                 
                 {/* AI HUD Overlay */}
@@ -408,6 +498,10 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
           <span className="text-[8px] font-black uppercase tracking-widest text-red-500">Hang Up</span>
         </button>
       </div>
+
+      {/* Hidden elements for capturing streams */}
+      <video ref={rawVideoRef} autoPlay muted playsInline className="hidden" />
+      <canvas ref={canvasRef} width={640} height={480} className="hidden" />
     </motion.div>
   );
 }

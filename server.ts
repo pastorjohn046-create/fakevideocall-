@@ -47,8 +47,12 @@ db.exec(`
   );
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
-    username TEXT,
+    username TEXT UNIQUE,
+    password TEXT,
     avatar TEXT,
+    bio TEXT,
+    settings TEXT,
+    customPersonas TEXT,
     lastSeen DATETIME
   );
 `);
@@ -58,9 +62,14 @@ try {
   db.exec(`ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'`);
   db.exec(`ALTER TABLE messages ADD COLUMN duration INTEGER`);
   db.exec(`ALTER TABLE messages ADD COLUMN mediaUrl TEXT`);
-} catch (e) {
-  // Columns likely already exist
-}
+} catch (e) {}
+
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN password TEXT`);
+  db.exec(`ALTER TABLE users ADD COLUMN bio TEXT`);
+  db.exec(`ALTER TABLE users ADD COLUMN settings TEXT`);
+  db.exec(`ALTER TABLE users ADD COLUMN customPersonas TEXT`);
+} catch (e) {}
 
 // Multer setup for general uploads
 const storage = multer.diskStorage({
@@ -126,6 +135,61 @@ app.post('/api/ai/suggest', async (req, res) => {
   } catch (error) {
     console.error('Gemini Error:', error);
     res.status(500).json({ error: 'Failed to generate suggestions' });
+  }
+});
+
+// Auth Routes
+app.post('/api/auth/signup', (req, res) => {
+  const { username, password, avatar } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  
+  try {
+    const id = 'user_' + Date.now();
+    const defaultSettings = JSON.stringify({ notifications: true, darkMode: false, readReceipts: true, deepfakeEnabled: true });
+    db.prepare('INSERT INTO users (id, username, password, avatar, settings) VALUES (?, ?, ?, ?, ?)').run(
+      id, username, password, avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`, defaultSettings
+    );
+    res.json({ id, username, avatar });
+  } catch (err: any) {
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      res.status(400).json({ error: 'Username already exists' });
+    } else {
+      res.status(500).json({ error: 'Signup failed' });
+    }
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE username = ? AND password = ?').get(username, password) as any;
+  if (user) {
+    try { user.settings = JSON.parse(user.settings || '{}'); } catch(e){}
+    try { user.customPersonas = JSON.parse(user.customPersonas || '[]'); } catch(e){}
+    res.json(user);
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
+
+// Users API
+app.get('/api/users/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json([]);
+  const users = db.prepare('SELECT id, username, avatar, bio FROM users WHERE username LIKE ? LIMIT 10').all(`%${q}%`);
+  res.json(users);
+});
+
+app.put('/api/users/:id', (req, res) => {
+  const { id } = req.params;
+  const { avatar, bio, settings, customPersonas } = req.body;
+  
+  try {
+    db.prepare('UPDATE users SET avatar = ?, bio = ?, settings = ?, customPersonas = ? WHERE id = ?').run(
+      avatar, bio, JSON.stringify(settings || {}), JSON.stringify(customPersonas || []), id
+    );
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Update failed' });
   }
 });
 

@@ -24,6 +24,13 @@ export interface CallSignal {
   chatId: string;
 }
 
+export interface Persona {
+  id: string;
+  name: string;
+  url: string;
+  type: 'image' | 'video';
+}
+
 export interface User {
   id: string;
   username: string;
@@ -38,7 +45,9 @@ export interface User {
     notifications: boolean;
     darkMode: boolean;
     readReceipts: boolean;
+    deepfakeEnabled?: boolean;
   };
+  customPersonas?: Persona[];
   stats?: {
     messagesSent: number;
     groupsJoined: number;

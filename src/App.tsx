@@ -14,39 +14,17 @@ import SmartReplies from './components/SmartReplies';
 import VoiceRecorder from './components/VoiceRecorder';
 import ProfileModal from './components/ProfileModal';
 import StickerPicker from './components/StickerPicker';
-
-const DEFAULT_USER: User = {
-  id: 'user_1',
-  username: 'John Doe',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-  bio: 'Product Designer & Aero enthusiast. Always online!',
-  location: 'San Francisco, CA',
-  website: 'https://aero.chat',
-  joinedAt: 'May 2024',
-  status: 'online',
-  settings: {
-    notifications: true,
-    darkMode: false,
-    readReceipts: true
-  },
-  stats: {
-    messagesSent: 1284,
-    groupsJoined: 12,
-    mediaShared: 45
-  }
-};
-
+import Auth from './components/Auth';
 import VideoCall from './components/VideoCall';
 
 const INITIAL_CHATS: Chat[] = [
   { id: 'chat_1', name: 'Design Team', avatar: 'https://api.dicebear.com/7.x/shapes/svg?seed=Design', lastMessage: 'See you tomorrow!', unreadCount: 2 },
   { id: 'chat_2', name: 'Alice', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alice', lastMessage: 'Hey, how is it going?', unreadCount: 0 },
-  { id: 'chat_3', name: 'Family Group', avatar: 'https://api.dicebear.com/7.x/shapes/svg?seed=Family', lastMessage: 'Lunch at 1?', unreadCount: 5 },
-  { id: 'chat_4', name: 'News Channel', avatar: 'https://api.dicebear.com/7.x/shapes/svg?seed=News', lastMessage: 'Breaking: Major discovery...', unreadCount: 12 },
 ];
 
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -56,7 +34,7 @@ export default function App() {
   const [isCalling, setIsCalling] = useState(false);
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [incomingCall, setIncomingCall] = useState<{ from: string, signal: any } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,7 +100,7 @@ export default function App() {
 
     const newMessage: Message = {
       id: Math.random().toString(36).substr(2, 9),
-      sender: currentUser.username,
+      sender: currentUser!.username,
       content: text,
       timestamp: new Date().toISOString(),
       chatId: activeChat.id,
@@ -134,12 +112,33 @@ export default function App() {
     setSuggestions([]);
   };
 
+  const handleStartChat = (user: User) => {
+    // Generate a consistent room ID for 1-on-1 chats
+    const roomId = [currentUser!.id, user.id].sort().join('_');
+    
+    // Check if chat already exists
+    const existing = chats.find(c => c.id === roomId);
+    if (existing) {
+      setActiveChat(existing);
+    } else {
+      const newChat: Chat = {
+        id: roomId,
+        name: user.username,
+        avatar: user.avatar,
+        lastMessage: 'Say hi!',
+        unreadCount: 0
+      };
+      setChats([newChat, ...chats]);
+      setActiveChat(newChat);
+    }
+  };
+
   const handleSendSticker = (url: string) => {
     if (!socket || !activeChat) return;
 
     const newMessage: Message = {
       id: Math.random().toString(36).substr(2, 9),
-      sender: currentUser.username,
+      sender: currentUser!.username,
       content: '[Sticker]',
       timestamp: new Date().toISOString(),
       chatId: activeChat.id,
@@ -214,6 +213,10 @@ export default function App() {
     }
   };
 
+  if (!currentUser) {
+    return <Auth onLogin={setCurrentUser} />;
+  }
+
   return (
     <div className="flex h-screen w-full bg-gray-50 overflow-hidden font-sans relative">
       <AnimatePresence mode="wait">
@@ -228,11 +231,12 @@ export default function App() {
             className={`h-full border-r border-gray-200 bg-white z-20 ${activeChat ? 'hidden md:flex w-80' : 'w-full md:w-80'}`}
           >
             <ChatSidebar 
-              chats={INITIAL_CHATS} 
+              chats={chats} 
               currentUser={currentUser}
               activeChatId={activeChat?.id} 
-              onSelectChat={(id) => setActiveChat(INITIAL_CHATS.find((c) => c.id === id) || null)} 
+              onSelectChat={(id) => setActiveChat(chats.find((c) => c.id === id) || null)} 
               onOpenProfile={() => setIsProfileOpen(true)}
+              onStartChat={handleStartChat}
             />
             {/* FAB for new chat on mobile */}
             {!activeChat && (
@@ -405,6 +409,11 @@ export default function App() {
             user={currentUser}
             onClose={() => setIsProfileOpen(false)}
             onUpdate={(u) => setCurrentUser(u)}
+            onLogout={() => {
+              setCurrentUser(null);
+              setIsProfileOpen(false);
+              setActiveChat(null);
+            }}
           />
         )}
         
@@ -413,6 +422,7 @@ export default function App() {
             chatName={activeChat.name}
             chatId={activeChat.id}
             socket={socket}
+            user={currentUser}
             onEnd={() => {
               setIsCalling(false);
               setIncomingCall(null);
