@@ -47,6 +47,13 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
   const peerRef = useRef<Peer.Instance | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Motion and Audio Sync Refs
+  const motionRef = useRef({ x: 0.5, y: 0.5, audioLevel: 0 });
+  const prevFrameRef = useRef<Uint8ClampedArray | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const trackingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const stateRef = useRef({ isDeepFakeMode, isVideoOn, selectedPersona });
   useEffect(() => {
     stateRef.current = { isDeepFakeMode, isVideoOn, selectedPersona };
@@ -58,15 +65,84 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
     const ctx = canvas.getContext('2d');
     let animationFrameId: number;
 
+    // Setup tracking canvas once
+    if (!trackingCanvasRef.current) {
+      trackingCanvasRef.current = document.createElement('canvas');
+      trackingCanvasRef.current.width = 64;
+      trackingCanvasRef.current.height = 48;
+    }
+
     const draw = () => {
       const { isDeepFakeMode, isVideoOn, selectedPersona } = stateRef.current;
       
-      if (isDeepFakeMode) {
-        if (selectedPersona.type === 'video' && personaVideoRef.current) {
-          ctx?.drawImage(personaVideoRef.current, 0, 0, canvas.width, canvas.height);
-        } else if (selectedPersona.type === 'image' && personaImageRef.current) {
-          ctx?.drawImage(personaImageRef.current, 0, 0, canvas.width, canvas.height);
+      // Perform motion tracking if raw video is playing
+      if (rawVideoRef.current && rawVideoRef.current.readyState === rawVideoRef.current.HAVE_ENOUGH_DATA) {
+        const tCanvas = trackingCanvasRef.current!;
+        const tCtx = tCanvas.getContext('2d', { willReadFrequently: true });
+        if (tCtx) {
+          tCtx.drawImage(rawVideoRef.current, 0, 0, 64, 48);
+          const imageData = tCtx.getImageData(0, 0, 64, 48);
+          const data = imageData.data;
+          let motionX = 0, motionY = 0, motionCount = 0;
+
+          if (prevFrameRef.current) {
+            for (let i = 0; i < data.length; i += 4) {
+              const diff = Math.abs(data[i] - prevFrameRef.current[i]) + 
+                           Math.abs(data[i+1] - prevFrameRef.current[i+1]) + 
+                           Math.abs(data[i+2] - prevFrameRef.current[i+2]);
+              if (diff > 45) { // Sensitivity threshold
+                const pixelIndex = i / 4;
+                motionX += pixelIndex % 64;
+                motionY += Math.floor(pixelIndex / 64);
+                motionCount++;
+              }
+            }
+          }
+          prevFrameRef.current = new Uint8ClampedArray(data);
+
+          if (motionCount > 5) {
+            const targetX = (motionX / motionCount) / 64;
+            const targetY = (motionY / motionCount) / 48;
+            // Mirror X because camera is usually mirrored
+            motionRef.current.x += ((1 - targetX) - motionRef.current.x) * 0.15;
+            motionRef.current.y += (targetY - motionRef.current.y) * 0.15;
+          }
         }
+      }
+
+      // Audio analysis
+      if (analyserRef.current) {
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
+        motionRef.current.audioLevel += (average - motionRef.current.audioLevel) * 0.3;
+      }
+
+      // Calculate dynamic transforms
+      // X and Y offsets map the 0..1 range to pixel movements
+      const offsetX = (motionRef.current.x - 0.5) * 60;
+      const offsetY = (motionRef.current.y - 0.5) * 60;
+      // Audio level causes a slight scale pulsing, simulating breathing/talking
+      const audioScale = 1 + (motionRef.current.audioLevel / 255) * 0.12;
+
+      // Update local DOM elements for instant visual feedback
+      if (isDeepFakeMode) {
+        const transformStr = `translate(${offsetX}px, ${offsetY}px) scale(${audioScale})`;
+        if (personaImageRef.current) personaImageRef.current.style.transform = transformStr;
+        if (personaVideoRef.current) personaVideoRef.current.style.transform = transformStr;
+      }
+      
+      if (isDeepFakeMode) {
+        ctx?.save();
+        ctx?.translate(canvas.width / 2 + offsetX * 2, canvas.height / 2 + offsetY * 2);
+        ctx?.scale(audioScale, audioScale);
+
+        if (selectedPersona.type === 'video' && personaVideoRef.current) {
+          ctx?.drawImage(personaVideoRef.current, -canvas.width/2 - 40, -canvas.height/2 - 40, canvas.width + 80, canvas.height + 80);
+        } else if (selectedPersona.type === 'image' && personaImageRef.current) {
+          ctx?.drawImage(personaImageRef.current, -canvas.width/2 - 40, -canvas.height/2 - 40, canvas.width + 80, canvas.height + 80);
+        }
+        ctx?.restore();
       } else {
         if (isVideoOn && rawVideoRef.current) {
           ctx?.drawImage(rawVideoRef.current, 0, 0, canvas.width, canvas.height);
@@ -89,6 +165,16 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
         setLocalStream(stream);
         if (rawVideoRef.current) rawVideoRef.current.srcObject = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+        // Initialize Audio Analysis
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioContext();
+        const analyser = audioCtx.createAnalyser();
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.fftSize = 256;
+        audioContextRef.current = audioCtx;
+        analyserRef.current = analyser;
 
         // Combine canvas video stream with real microphone audio
         const canvasStream = canvasRef.current!.captureStream(30);
@@ -136,6 +222,9 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
     return () => {
       localStream?.getTracks().forEach(t => t.stop());
       peerRef.current?.destroy();
+      if (audioContextRef.current?.state !== 'closed') {
+        audioContextRef.current?.close();
+      }
     };
   }, []);
 
@@ -238,7 +327,7 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
                     muted 
                     playsInline 
                     crossOrigin="anonymous"
-                    className="w-full h-full object-cover filter brightness-125 saturate-[1.2] contrast-[1.1]" 
+                    className="w-[120%] h-[120%] -ml-[10%] -mt-[10%] object-cover max-w-none transition-transform duration-75 filter brightness-125 saturate-[1.2] contrast-[1.1]" 
                   />
                 ) : (
                   <motion.div
@@ -256,16 +345,7 @@ export default function VideoCall({ chatName, onEnd, socket, chatId, isIncoming,
                       ref={personaImageRef}
                       src={selectedPersona.url} 
                       crossOrigin="anonymous"
-                      animate={{ 
-                        scale: [1.1, 1.12, 1.1], // Slightly scaled up to hide edges during rotation
-                        filter: ['brightness(1.25) saturate(1.2) contrast(1.1)', 'brightness(1.3) saturate(1.2) contrast(1.1)', 'brightness(1.25) saturate(1.2) contrast(1.1)']
-                      }}
-                      transition={{ 
-                        duration: 4, 
-                        repeat: Infinity, 
-                        ease: "easeInOut" 
-                      }}
-                      className="w-full h-full object-cover" 
+                      className="w-[120%] h-[120%] -ml-[10%] -mt-[10%] object-cover max-w-none transition-transform duration-75" 
                     />
                   </motion.div>
                 )}
