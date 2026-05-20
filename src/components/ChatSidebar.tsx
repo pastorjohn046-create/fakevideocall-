@@ -31,30 +31,30 @@ export default function ChatSidebar({ chats, currentUser, activeChatId, onSelect
   }, [searchQuery, currentUser.id]);
 
   return (
-    <div className="w-full md:w-80 h-full border-r border-gray-200 bg-white flex flex-col">
-      <div className="p-4 flex items-center gap-3">
+    <div className="w-full md:w-80 h-full border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col safe-left">
+      <div className="p-4 safe-top flex items-center gap-3">
         <button 
           onClick={onOpenProfile}
           className="relative group shrink-0"
         >
           <img src={currentUser.avatar} alt="My Profile" className="w-10 h-10 rounded-full object-cover ring-2 ring-transparent group-hover:ring-blue-400 transition-all shadow-sm" />
-          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
+          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white dark:bg-gray-950 rounded-full flex items-center justify-center shadow-sm">
             <div className={`w-2 h-2 rounded-full ${currentUser.status === 'busy' ? 'bg-red-500' : currentUser.status === 'away' ? 'bg-yellow-500' : 'bg-green-500'}`} />
           </div>
         </button>
         <div className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input 
             type="text" 
             placeholder="Search users..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-100 border-none rounded-full py-2 pl-10 pr-4 text-sm text-black focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+            className="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-full py-2 pl-10 pr-4 text-sm text-black dark:text-white focus:ring-2 focus:ring-blue-500 transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
           />
         </div>
         <button 
           onClick={onOpenProfile}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors text-gray-400 dark:text-gray-500"
         >
           <Settings className="w-5 h-5" />
         </button>
@@ -63,9 +63,9 @@ export default function ChatSidebar({ chats, currentUser, activeChatId, onSelect
       <div className="flex-1 overflow-y-auto">
         {searchQuery ? (
           <div className="p-2">
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Search Results</h4>
+            <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">Search Results</h4>
             {searchResults.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No users found</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No users found</p>
             ) : (
               searchResults.map(user => (
                 <button
@@ -74,12 +74,12 @@ export default function ChatSidebar({ chats, currentUser, activeChatId, onSelect
                     setSearchQuery('');
                     onStartChat(user);
                   }}
-                  className="w-full p-3 flex gap-3 hover:bg-gray-50 transition-colors rounded-xl items-center"
+                  className="w-full p-3 flex gap-3 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors rounded-xl items-center"
                 >
                   <img src={user.avatar} className="w-10 h-10 rounded-full object-cover" />
                   <div className="flex-1 text-left min-w-0">
-                    <h3 className="font-semibold text-black truncate">{user.username}</h3>
-                    <p className="text-xs text-gray-500 truncate">{user.bio || 'New user'}</p>
+                    <h3 className="font-semibold text-black dark:text-white truncate">{user.username}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.bio || 'New user'}</p>
                   </div>
                   <UserPlus className="w-5 h-5 text-blue-500" />
                 </button>
@@ -91,19 +91,19 @@ export default function ChatSidebar({ chats, currentUser, activeChatId, onSelect
             <button
               key={chat.id}
               onClick={() => onSelectChat(chat.id)}
-              className={`w-full p-3 flex gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${activeChatId === chat.id ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
+              className={`w-full p-3 flex gap-3 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-b border-gray-50 dark:border-gray-900/50 ${activeChatId === chat.id ? 'bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-50 dark:hover:bg-blue-950/50' : ''}`}
             >
               <div className="relative">
                 <img src={chat.avatar} alt={chat.name} className="w-12 h-12 rounded-full object-cover" />
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-950 rounded-full"></div>
               </div>
               <div className="flex-1 text-left min-w-0">
                 <div className="flex justify-between items-baseline">
-                  <h3 className="font-semibold text-black truncate">{chat.name}</h3>
-                  <span className="text-xs text-gray-400"></span>
+                  <h3 className="font-semibold text-black dark:text-white truncate">{chat.name}</h3>
+                  <span className="text-xs text-gray-400 dark:text-gray-500"></span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
-                  <p className="text-sm text-gray-500 truncate">{chat.lastMessage || 'No messages yet'}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{chat.lastMessage || 'No messages yet'}</p>
                   {chat.unreadCount ? (
                     <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[20px] text-center">
                       {chat.unreadCount}

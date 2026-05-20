@@ -292,6 +292,12 @@ export default function ProfileModal({ user, onClose, onUpdate, onLogout }: Prof
                   isActive={!!formData.settings?.readReceipts}
                   onClick={() => toggleSetting('readReceipts')}
                 />
+                <SettingToggle 
+                  icon={<Moon className="w-5 h-5" />} 
+                  label="Dark Mode" 
+                  isActive={!!formData.settings?.darkMode}
+                  onClick={() => toggleSetting('darkMode')}
+                />
                 
                 <div className="mt-8 p-6 bg-red-50 dark:bg-red-900/10 rounded-3xl border border-red-100 dark:border-red-800/20 text-center">
                   <p className="text-sm font-semibold text-red-600 mb-4">Want to sign out from AeroChat?</p>
@@ -433,6 +439,8 @@ export default function ProfileModal({ user, onClose, onUpdate, onLogout }: Prof
                     </p>
                   </div>
                 </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 

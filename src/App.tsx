@@ -38,6 +38,21 @@ export default function App() {
   const [incomingCall, setIncomingCall] = useState<{ from: string, signal: any } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.settings?.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const newSocket = io();
@@ -221,7 +236,7 @@ export default function App() {
     <div className="flex h-screen w-full bg-gray-50 overflow-hidden font-sans relative">
       <AnimatePresence mode="wait">
         {/* Sidebar */}
-        {(!activeChat || window.innerWidth >= 768) && (
+        {(!activeChat || windowWidth >= 768) && (
           <motion.div 
             key="sidebar"
             initial={{ x: -20, opacity: 0 }}
@@ -248,53 +263,53 @@ export default function App() {
         )}
 
         {/* Main Chat Area */}
-        {(activeChat || window.innerWidth >= 768) && (
+        {(activeChat || windowWidth >= 768) && (
           <motion.div 
             key="chat"
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 20, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className={`flex-1 flex flex-col h-full bg-gray-50 z-10 ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex w-full'}`}
+            className={`flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-950 z-10 ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex w-full'}`}
           >
             {activeChat ? (
               <>
                 {/* Chat Header */}
-                <header className="h-16 md:h-18 px-4 border-b border-gray-200 bg-white/90 backdrop-blur-md flex items-center justify-between sticky top-0 z-30">
+                <header className="min-h-16 md:min-h-18 py-3 px-4 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md flex items-center justify-between sticky top-0 z-30 safe-top">
                   <div className="flex items-center gap-2 md:gap-4">
                     <button 
                       onClick={() => setActiveChat(null)} 
-                      className="md:hidden p-3 -ml-2 hover:bg-gray-100 rounded-full active:bg-gray-200 transition-colors"
+                      className="md:hidden p-3 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full active:bg-gray-200 dark:active:bg-gray-800 transition-colors"
                     >
-                      <ArrowLeft className="w-6 h-6 text-gray-700" />
+                      <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300" />
                     </button>
                     <div className="relative">
                       <img src={activeChat.avatar} alt={activeChat.name} className="w-10 h-10 md:w-11 md:h-11 rounded-full object-cover shadow-sm" />
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-950 rounded-full"></div>
                     </div>
                     <div className="min-w-0">
-                      <h2 className="font-bold text-gray-900 truncate leading-tight">{activeChat.name}</h2>
+                      <h2 className="font-bold text-gray-900 dark:text-white truncate leading-tight">{activeChat.name}</h2>
                       <p className="text-[11px] md:text-xs text-green-500 font-semibold uppercase tracking-wider">online</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 md:gap-2 text-gray-500">
-                <button className="p-2.5 hover:bg-gray-100 rounded-full transition-colors hidden sm:block">
-                  <Phone className="w-5 h-5 text-blue-500" />
-                </button>
-                <button 
-                  onClick={() => setIsCalling(true)}
-                  className="p-2.5 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
-                >
-                  <Video className="w-5 h-5 text-blue-500" />
-                </button>
-                    <button className="p-2.5 hover:bg-gray-100 rounded-full transition-colors">
+                  <div className="flex items-center gap-1 md:gap-2 text-gray-500 dark:text-gray-400">
+                    <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors hidden sm:block">
+                      <Phone className="w-5 h-5 text-blue-500" />
+                    </button>
+                    <button 
+                      onClick={() => setIsCalling(true)}
+                      className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors hidden sm:block"
+                    >
+                      <Video className="w-5 h-5 text-blue-500" />
+                    </button>
+                    <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                       <MoreVertical className="w-5 h-5" />
                     </button>
                   </div>
                 </header>
 
                 {/* Messages Area */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#e5ddd5] bg-[url('https://wallpaperaccess.com/full/1288290.jpg')] bg-repeat bg-center">
+                <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#e5ddd5] dark:bg-gray-950 bg-[url('https://wallpaperaccess.com/full/1288290.jpg')] dark:bg-[url('https://i.pinimg.com/originals/8f/c9/8a/8fc98a728b76c8cbfdd51c888e285a28.jpg')] bg-repeat bg-center bg-blend-overlay dark:bg-blend-multiply dark:bg-black/60">
                   <div className="max-w-4xl mx-auto space-y-4">
                     {messages.map((msg) => (
                       <div key={msg.id}>
@@ -309,7 +324,7 @@ export default function App() {
                 </main>
 
                 {/* Input Area */}
-                <footer className="bg-white/95 backdrop-blur-md border-t border-gray-100 p-3 md:p-4 safe-bottom">
+                <footer className="bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-900 p-3 md:p-4 safe-bottom">
                   <div className="max-w-4xl mx-auto flex flex-col gap-3">
                     <SmartReplies 
                       replies={suggestions} 
@@ -334,11 +349,11 @@ export default function App() {
                           />
                           <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="p-3 text-gray-400 hover:text-blue-500 active:scale-90 transition-all rounded-full hover:bg-blue-50"
+                            className="p-3 text-gray-400 dark:text-gray-500 hover:text-blue-500 active:scale-90 transition-all rounded-full hover:bg-blue-50 dark:hover:bg-gray-900"
                           >
                             <Paperclip className="w-6 h-6" />
                           </button>
-                          <div className="flex-1 bg-gray-100 rounded-2xl flex items-center p-1.5 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-400 focus-within:shadow-sm">
+                          <div className="flex-1 bg-gray-100 dark:bg-gray-900 rounded-2xl flex items-center p-1.5 transition-all focus-within:bg-white dark:focus-within:bg-gray-800 focus-within:ring-2 focus-within:ring-blue-400 focus-within:shadow-sm">
                             <textarea 
                               value={input}
                               onChange={(e) => setInput(e.target.value)}
@@ -349,13 +364,13 @@ export default function App() {
                                 }
                               }}
                               placeholder="Write a message..."
-                              className="flex-1 bg-transparent border-none outline-none text-black text-[15px] md:text-sm resize-none max-h-32 px-3 py-1.5 scrollbar-hide placeholder:text-gray-500"
+                              className="flex-1 bg-transparent border-none outline-none text-black dark:text-white text-[15px] md:text-sm resize-none max-h-32 px-3 py-1.5 scrollbar-hide placeholder:text-gray-500 dark:placeholder:text-gray-400"
                               rows={1}
                             />
                             <div className="relative">
                               <button 
                                 onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
-                                className={`p-2 rounded-full transition-colors ${isStickerPickerOpen ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-blue-500'}`}
+                                className={`p-2 rounded-full transition-colors ${isStickerPickerOpen ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-400 dark:text-gray-500 hover:text-blue-500'}`}
                               >
                                 <Smile className="w-6 h-6" />
                               </button>
@@ -379,7 +394,7 @@ export default function App() {
                           ) : (
                             <button 
                               onClick={() => setIsRecording(true)}
-                              className="p-3.5 rounded-full transition-all flex-shrink-0 bg-gray-100 text-gray-400 hover:text-blue-500 hover:bg-blue-50 active:scale-95"
+                              className="p-3.5 rounded-full transition-all flex-shrink-0 bg-gray-100 dark:bg-gray-900 text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-95"
                             >
                               <Mic className="w-6 h-6" />
                             </button>
@@ -391,12 +406,12 @@ export default function App() {
                 </footer>
               </>
             ) : (
-              <div className="text-center p-10 bg-white/60 backdrop-blur-lg rounded-[2.5rem] border border-white/50 shadow-2xl flex flex-col items-center max-w-sm mx-auto">
+              <div className="text-center p-10 bg-white/60 dark:bg-gray-900/60 backdrop-blur-lg rounded-[2.5rem] border border-white/50 dark:border-gray-800/50 shadow-2xl flex flex-col items-center max-w-sm mx-auto">
                 <div className="w-24 h-24 bg-gradient-to-tr from-blue-500 to-blue-400 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-100">
                   <Send className="w-10 h-10 text-white -rotate-12 translate-x-1" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">Welcome to AeroChat</h2>
-                <p className="text-gray-500 leading-relaxed">Select a conversation from the sidebar to start messaging with your team and friends.</p>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Welcome to AeroChat</h2>
+                <p className="text-gray-500 dark:text-gray-400 leading-relaxed">Select a conversation from the sidebar to start messaging with your team and friends.</p>
               </div>
             )}
           </motion.div>

@@ -13,11 +13,30 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+  
+  .safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
 
 @layer base {
   body {
     @apply antialiased text-black dark:text-white dark:bg-gray-950;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    
+    /* App-like behaviors */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  
+  input, textarea {
+    -webkit-user-select: auto;
+    user-select: auto;
   }
 }

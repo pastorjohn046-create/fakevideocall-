@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <!-- Accent Gradient for Wings/Plane -->
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#f0f9ff" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background shape (Squircle / rounded app icon style) -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#bg-grad)" />
+
+  <!-- Outer Ring Glow -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="none" stroke="#60a5fa" stroke-width="4" stroke-opacity="0.3" />
+
+  <!-- Chat Bubble + Wing Silhouette (The Logo Mark) -->
+  <g filter="url(#shadow)">
+    <!-- Sleek Chat Bubble Shadow/Backing -->
+    <path d="M160,180 C160,135.8 202.9,100 256,100 C309.1,100 352,135.8 352,180 C352,204.3 339.4,225.8 319.4,240.2 L330,285 C331.2,290.2 325.8,294.2 321.4,291.4 L288,270.3 C277.6,273.9 266.8,275.8 256,275.8 C202.9,275.8 160,240 160,180 Z" fill="#ffffff" fill-opacity="0.10" />
+    
+    <!-- Soaring Paper Plane / Aero Wing inside -->
+    <path d="M190 280 L350 200 L270 330 L250 280 Z" fill="url(#accent-grad)" />
+    <path d="M250 280 L350 200 L190 280 Z" fill="#ffffff" fill-opacity="0.80" />
+    <path d="M250 280 L270 330 L280 295 Z" fill="#0284c7" />
+  </g>
+</svg>
